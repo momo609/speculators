@@ -13,6 +13,7 @@ from torch.distributed.checkpoint.state_dict import (
     set_optimizer_state_dict,
 )
 from transformers.modeling_utils import PreTrainedModel
+from speculators.utils.util import is_torch_npu_available
 
 
 class BaseCheckpointer:
@@ -126,10 +127,16 @@ class SingleGPUCheckpointer(BaseCheckpointer):
     def load_model_state_dict(
         self, model: PreTrainedModel, float_dtype: torch.dtype | None = None
     ):
-        full_state_dict = load_safetensors_state_dict(
-            self.model_path(self.previous_epoch),
-            "cuda:0",  # todo: generalize
-        )
+        if is_torch_npu_available():
+            full_state_dict = load_safetensors_state_dict(
+                self.model_path(self.previous_epoch),
+                "npu:0",  # todo: generalize
+            )
+        else:
+            full_state_dict = load_safetensors_state_dict(
+                self.model_path(self.previous_epoch),
+                "cuda:0",  # todo: generalize
+            )
         full_state_dict = convert_float_dtype(
             full_state_dict, float_dtype or model.dtype
         )
@@ -142,11 +149,18 @@ class SingleGPUCheckpointer(BaseCheckpointer):
         optimizer: torch.optim.Optimizer,
         float_dtype: torch.dtype | None = None,
     ):
-        full_state_dict = torch.load(
-            self.optimizer_path(self.previous_epoch),
-            weights_only=True,
-            map_location="cuda:0",  # todo: generalize
-        )
+        if is_torch_npu_available():
+            full_state_dict = torch.load(
+                self.optimizer_path(self.previous_epoch),
+                weights_only=True,
+                map_location="npu:0",  # todo: generalize
+            )
+        else:
+            full_state_dict = torch.load(
+                self.optimizer_path(self.previous_epoch),
+                weights_only=True,
+                map_location="cuda:0",  # todo: generalize
+            )
         full_state_dict = convert_float_dtype(
             full_state_dict, float_dtype or model.dtype
         )

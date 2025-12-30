@@ -20,7 +20,7 @@ Usage:
     Note: You can call the script with environment variables (like
     `CUDA_VISIBLE_DEVICES` and `HF_HOME`) to control the behavior of the scripts.
 """
-
+import torch
 import enum
 import shutil
 import subprocess
@@ -35,6 +35,7 @@ from speculators.train.vocab_mapping import (
     combine_token_frequency_distributions,
 )
 
+from speculators.utils.util import is_torch_npu_available
 
 class _NS(enum.Enum):
     """Class containing a sentinel value used to indicate unset arguments."""
@@ -325,10 +326,13 @@ def run_e2e(
             loggers = loggers.split(",")
         loggers = [logger.strip() for logger in loggers]
         packages.extend(loggers)
-
+    if is_torch_npu_available():
+        device_count = torch.npu.device_count()
+    else:
+        device_count = torch.cuda.device_count()
     run_script(
-        "train.py",
-        ta_list,
-        packages,
-        python_alt="torchrun --standalone --nproc_per_node=gpu",
-    )
+            "train.py",
+            ta_list,
+            packages,
+            python_alt=f"torchrun --standalone --nproc_per_node={device_count}",
+        )

@@ -24,6 +24,7 @@ from vllm.v1.core.sched.scheduler import Scheduler
 from vllm.v1.executor.multiproc_executor import MultiprocExecutor
 from vllm.v1.request import Request, RequestStatus
 from vllm.v1.structured_output import StructuredOutputManager
+from speculators.utils.util import is_torch_npu_available
 
 from .logging_utils import PipelineLogger
 
@@ -133,7 +134,10 @@ class VllmHiddenStatesGenerator:
         unify_hybrid_kv_cache_specs(kv_cache_spec)
         kv_cache_groups = _get_kv_cache_groups_uniform_spec(kv_cache_spec)
 
-        free_memory, _ = torch.cuda.mem_get_info()
+        if is_torch_npu_available():
+            free_memory, _ = torch.npu.mem_get_info()
+        else:
+            free_memory, _ = torch.cuda.mem_get_info()
         cache_memory = int(free_memory * gpu_memory_utilization * CACHE_MEMORY_FRACTION)
 
         kv_cache_config = get_kv_cache_config_from_groups(
@@ -310,8 +314,10 @@ class VllmHiddenStatesGenerator:
                 }
             )
             offset += seq_len
-
-        torch.cuda.empty_cache()
+        if is_torch_npu_available():
+            torch.npu.empty_cache()
+        else:
+            torch.cuda.empty_cache()
 
         return results
 

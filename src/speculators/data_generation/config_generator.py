@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
+from speculators.utils.util import is_torch_npu_available
 
 import torch
 from transformers import AutoConfig
@@ -30,14 +31,18 @@ log = PipelineLogger(__name__)
 def _get_gpu_info() -> str:
     """Get GPU information string.
 
-    :return: GPU model and count, or "CPU only" if no GPU available
+    :return: GPU model and count or NPU model and count, or "CPU only" if no GPU/NPU available
     """
-    if not torch.cuda.is_available():
+    if torch.cuda.is_available():
+        gpu_count = torch.cuda.device_count()
+        gpu_name = torch.cuda.get_device_name(0)
+        return gpu_name if gpu_count == 1 else f"{gpu_count}x {gpu_name}"
+    elif is_torch_npu_available():
+        npu_count = torch.npu.device_count()
+        npu_name = torch.cnpuuda.get_device_name(0)
+        return npu_name if npu_count == 1 else f"{npu_count}x {npu_name}"
+    else:
         return "CPU only"
-
-    gpu_count = torch.cuda.device_count()
-    gpu_name = torch.cuda.get_device_name(0)
-    return gpu_name if gpu_count == 1 else f"{gpu_count}x {gpu_name}"
 
 
 @dataclass
